@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+
+import json
+import os
+from os.path import expandvars, expanduser
+
+import sys
+from path import Path
+
+# $HOME/.config/mimeapps.list
+# https://wiki.archlinux.org/index.php/Default_applications#Default_mimeapps.list_files
+
+
+# **** UTILITIES
+
+def expand(path):
+    return expandvars(expanduser(path))
+
+# **** APPLICATION
+from collections import OrderedDict
+
+DESKTOP = '''[Desktop Entry]
+Version=1.0
+Type=Application
+Name={}
+Comment=Created by extify
+Exec={} %F
+Terminal=true
+'''
+def make_app(path, name=None):
+    if name is None:
+        name = path
+
+    return DESKTOP.format(name, path)
+
+
+# **** EXTENSION
+MIMETYPE = '''<?xml version="1.0" encoding="utf-8"?>
+<mime-info xmlns='http://www.freedesktop.org/standards/shared-mime-info'>
+<mime-type type="{}">
+    <glob pattern="*.{}"/>
+</mime-type>
+</mime-info>
+'''
+def make_type(mime, ext):
+    return MIMETYPE.format(mime, ext)
+
+
+def add_mime(path, ext):
+
+    # **** APPLICATION.desktop
+    # share/applications
+
+    d_data = make_app(path=path)
+    d_path = '%s.desktop' % path
+    with open(expand('~/.local/share/applications/' + d_path), 'w') as d_file:
+        d_file.write(d_data)
+
+
+    # **** EXTENSION.xml
+    # share/mime/packages
+    e_type = 'text/x-' + ext
+    e_data = make_type(mime=e_type, ext=ext)
+    with open(expand('~/.local/share/mime/packages/%s.xml' % ext), 'w') as e_file:
+        e_file.write(e_data)
+
+
+    # **** ASSOCIATION
+    # .config/mimeapps.list
+
+    # xdg-mime default app.desktop mime/mime
+    os.system('xdg-mime default {} {}'
+              .format(d_path, e_type))
+
+
+def update_mime():
+    # https://wiki.archlinux.org/index.php/Default_applications#Example:_.xml_and_related_.desktop_configuration
+    os.system('update-desktop-database ~/.local/share/applications')
+    os.system('update-mime-database    ~/.local/share/mime')
+
+
+def main():
+    _ = sys.argv
+
+    add_mime('faustlive', 'dsp')
+    update_mime()
+
+
+if __name__ == '__main__':
+    main()

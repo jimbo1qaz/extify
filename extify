@@ -27,11 +27,18 @@ Comment=Created by extify
 Exec={} %F
 Terminal=true
 '''
-def make_app(path, name=None):
-    if name is None:
-        name = path
 
-    return DESKTOP.format(name, path)
+def write_app(path):
+    # **** APPLICATION.desktop
+    # share/applications
+
+    d_data = DESKTOP.format(path, path)
+
+    desk_path = '%s.desktop' % path
+    with open(expand('~/.local/share/applications/' + desk_path), 'w') as d_file:
+        d_file.write(d_data)
+
+    return desk_path
 
 
 # **** EXTENSION
@@ -42,38 +49,23 @@ MIMETYPE = '''<?xml version="1.0" encoding="utf-8"?>
 </mime-type>
 </mime-info>
 '''
-def make_type(mime, ext):
-    return MIMETYPE.format(mime, ext)
 
-
-def add_mime(path, ext):
-
-    # **** APPLICATION.desktop
-    # share/applications
-
-    d_data = make_app(path=path)
-    d_path = '%s.desktop' % path
-    with open(expand('~/.local/share/applications/' + d_path), 'w') as d_file:
-        d_file.write(d_data)
-
-
+def write_ext(desk_path, ext):
     # **** EXTENSION.xml
     # share/mime/packages
-    e_type = 'text/x-' + ext
-    e_data = make_type(mime=e_type, ext=ext)
+
+    ext_type = 'text/x-' + ext
+    e_data = MIMETYPE.format(ext_type, ext)
     with open(expand('~/.local/share/mime/packages/%s.xml' % ext), 'w') as e_file:
         e_file.write(e_data)
 
-
-    # **** ASSOCIATION
     # .config/mimeapps.list
-
     # xdg-mime default app.desktop mime/mime
     os.system('xdg-mime default {} {}'
-              .format(d_path, e_type))
+              .format(desk_path, ext_type))
 
 
-def update_mime():
+def update_db():
     # https://wiki.archlinux.org/index.php/Default_applications#Example:_.xml_and_related_.desktop_configuration
     os.system('update-desktop-database ~/.local/share/applications')
     os.system('update-mime-database    ~/.local/share/mime')
@@ -82,8 +74,20 @@ def update_mime():
 def main():
     _ = sys.argv
 
-    add_mime('faustlive', 'dsp')
-    update_mime()
+    prog = sys.argv[1]
+    exts = sys.argv[2:]
+
+    desk_path = write_app(prog)
+    for ext in exts:
+        if ext[0] == '.':
+            ext = ext[1:]
+
+        if '.' in ext:
+            raise ValueError("I'm sorry Dave, but %s is not a valid file extension." % ext)
+
+        write_ext(desk_path, ext)
+
+    update_db()
 
 
 if __name__ == '__main__':
